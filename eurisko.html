@@ -4,7 +4,7 @@
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
 <script>
 var db = new PouchDB('eurisko'),
-    remote = 'https://eurisko:nox721!carpe@eurisko.cloudant.com/eurisko',
+    remote = 'https://istersurovedgeoppossells:613aa703284b318205b178a486b6f7344d7b0c2a@eurisko.cloudant.com/eurisko',
     opts = {
       continuous: true
     };
@@ -56,22 +56,67 @@ function remove()
 	// {ok: true, id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", rev: "3-c35dceb6732ec828befdf67e817565e7"}
 }
 
-function search()
+function search(type, query)
 {
 	// separate the type and query by a colon
-	type = 'content';
-	query = $("#search").val();
 	url = "https://eurisko.cloudant.com/eurisko/_design/searchDoc/_search/searchIndex?q="
 	suffix = type + ":" + query
-	$.get(url + suffix, function(data)
-	{
-  		console.log(data);
+	console.log(suffix);
+	$.ajax
+	({
+  		type: "GET",
+  		url: url + suffix,
+  		dataType: 'json',
+  		async: true,
+  		headers: {
+    		"Authorization": "Basic " + btoa('istersurovedgeoppossells' + ":" + '613aa703284b318205b178a486b6f7344d7b0c2a')
+  		},
+  		success: function (data)
+  		{
+    		console.log(data);
+  		}
 	});
 	// response is:
 	// {"total_rows":1,"bookmark":"g2wAAAABaANkACFkYmNvcmVAZGIxMy5tZXJpdGFnZS5jbG91ZGFudC5uZXRsAAAAAm4EAAAAAIBuBAD___-_amgCRj_IjFiAAAAAYQBq","rows":[{"id":"1","order":[0.19178301095962524,0],"fields":{"content":"hello world again","title":"first note"}}]}
 	// or when no results:
 	// {"total_rows":0,"bookmark":"g2o","rows":[]}
 }
+
+function parse_input()
+{
+	var input = $("#search").val();
+	if(input.search("\\+")==0)
+	{
+		//+ to append
+		console.log('new note');
+	}
+	else if(input.search("\\#")==0)
+	{
+		//#search tags
+		console.log('searching tags');
+	}
+	else if(input.search("\\>")==0)
+	{
+		console.log('appending to note');
+	}
+	else
+	{
+		console.log('searching');
+		search('title', input);
+		search('content', input);
+	}
+}
+
+//note format:
+//customer_id, title, content, child_of, children, last_updated, tags
+
+//link format:
+//@title
+
+//parse_search
+//add 'create new note'
+//issue title & content searches
+//parse append
 
 </script>
 </head>
@@ -80,7 +125,7 @@ function search()
 	<a href='javascript:write()'>write</a>
 	<a href='javascript:update()'>update</a>
 	<a href='javascript:remove()'>remove</a>
-	<a href='javascript:search()'>search</a>
+	<a href='javascript:parse_input()'>search</a>
 	<input type='text' id='search'>
 </div>
 <div id='note'></div>
