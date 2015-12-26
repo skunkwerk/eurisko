@@ -1,0 +1,87 @@
+<html>
+<head>
+<script src="http://cdn.jsdelivr.net/pouchdb/4.0.0/pouchdb.min.js"></script>
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script>
+var db = new PouchDB('eurisko'),
+    remote = 'https://eurisko:nox721!carpe@eurisko.cloudant.com/eurisko',
+    opts = {
+      continuous: true
+    };
+
+db.replicate.to(remote, opts);
+db.replicate.from(remote, opts);
+
+function read()
+{
+	db.get('1', function (err, response) 
+	{
+  		console.log(err || response);
+	});
+}
+
+// create a document; log the response
+function write()
+{
+	db.post({title: 'note2 title', content: 'second note'}, function (err, response)
+	{
+  		console.log(err || response);
+	});
+	//response is:
+	//{ok: true, id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", rev: "1-35fa8e78cc189bc7a9253a2f31296c40"}
+}
+
+function update()
+{
+	// update a document; log the response
+	db.put({_id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", _rev: "1-35fa8e78cc189bc7a9253a2f31296c40", name: 'Mike Broberg',title: 'Baseballer of the Ninth Circle'}, function (err, response) 
+	{
+  		console.log(err || response);
+	});
+	//response is:
+	//{ok: true, id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", rev: "2-07b996d6afbba32f73b7d772f061397a"}
+}
+
+function remove()
+{
+	// delete a document; log the response
+	db.remove({
+  		_id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE",
+  		_rev: "2-07b996d6afbba32f73b7d772f061397a"
+	}, function (err, response) 
+	{
+  		console.log(err || response);
+	});
+	// response is:
+	// {ok: true, id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", rev: "3-c35dceb6732ec828befdf67e817565e7"}
+}
+
+function search()
+{
+	// separate the type and query by a colon
+	type = 'content';
+	query = $("#search").val();
+	url = "https://eurisko.cloudant.com/eurisko/_design/searchDoc/_search/searchIndex?q="
+	suffix = type + ":" + query
+	$.get(url + suffix, function(data)
+	{
+  		console.log(data);
+	});
+	// response is:
+	// {"total_rows":1,"bookmark":"g2wAAAABaANkACFkYmNvcmVAZGIxMy5tZXJpdGFnZS5jbG91ZGFudC5uZXRsAAAAAm4EAAAAAIBuBAD___-_amgCRj_IjFiAAAAAYQBq","rows":[{"id":"1","order":[0.19178301095962524,0],"fields":{"content":"hello world again","title":"first note"}}]}
+	// or when no results:
+	// {"total_rows":0,"bookmark":"g2o","rows":[]}
+}
+
+</script>
+</head>
+<div id='title'>
+	<a href='javascript:read()'>read</a>
+	<a href='javascript:write()'>write</a>
+	<a href='javascript:update()'>update</a>
+	<a href='javascript:remove()'>remove</a>
+	<a href='javascript:search()'>search</a>
+	<input type='text' id='search'>
+</div>
+<div id='note'></div>
+</html>
