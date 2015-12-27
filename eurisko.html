@@ -2,6 +2,8 @@
 <head>
 <script src="http://cdn.jsdelivr.net/pouchdb/4.0.0/pouchdb.min.js"></script>
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script type="text/javascript" src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
+<link rel="stylesheet" type="text/css" href="https://code.jquery.com/ui/1.11.4/themes/ui-lightness/jquery-ui.css">
 <script>
 var db = new PouchDB('eurisko'),
     remote = 'https://istersurovedgeoppossells:613aa703284b318205b178a486b6f7344d7b0c2a@eurisko.cloudant.com/eurisko',
@@ -12,12 +14,77 @@ var db = new PouchDB('eurisko'),
 db.replicate.to(remote, opts);
 db.replicate.from(remote, opts);
 
+var timerSet = false;
+
+function openNote(note_id)
+{
+	db.get(note_id.toString(), function (err, response) 
+	{
+  		console.log(err || response);
+  		$("#note").html(response['content']);
+  		$("#note").attr("note_id", note_id);
+  		$("#note").attr('title',response['title']);
+  		$("#note").attr("rev", response['_rev']);
+  		parseTags(response['tags']);
+	});
+	setupChangeHandler();
+}
+
+function parseTags(tags)
+{
+	//need to be clickable links
+	for(var i=tags.length; i--;)
+	{
+		$("#tags").append(tags[i] + " ");
+	}
+}
+
+function createNote(title)
+{
+	$("#note").html("");
+	$("#note").attr('title',title);
+	setupChangeHandler();
+}
+
+function setupChangeHandler()
+{
+	/*document.getElementById("editor").addEventListener("input", function() {
+    alert("input event fired");
+	}, false);*/
+	$("#note").bind("input change", function()
+	{
+    	console.log("change happend");
+    	dealWithChange();
+	});
+	$("#tags").bind("input change", function()
+	{
+    	console.log("change happend");
+    	dealWithChange();
+	});
+}
+
+function dealWithChange()
+{
+	if(timerSet == true)
+	{
+		//do nothing
+	}
+	else
+	{
+		setTimeout(update, 10000);//10 seconds
+		timerSet = true;
+	}
+}
+
 function read()
 {
 	db.get('1', function (err, response) 
 	{
   		console.log(err || response);
+  		$("#note").html(response['content']);
 	});
+	//response is:
+	//{title: "first note", content: "hello world again", _id: "1", _rev: "2-0266dc1ee2bc449514ea7d25106542cd"}
 }
 
 // create a document; log the response
@@ -33,13 +100,49 @@ function write()
 
 function update()
 {
-	// update a document; log the response
-	db.put({_id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", _rev: "1-35fa8e78cc189bc7a9253a2f31296c40", name: 'Mike Broberg',title: 'Baseballer of the Ninth Circle'}, function (err, response) 
+	var note_id = $("#note").attr('note_id');
+	var value = $("#note").html();
+	var rev = $("#note").attr('rev');
+	var title = $("#note").attr('title');
+	var tags = $("#tags").html();
+	var tag_array = null;
+	if(tags!="")
 	{
-  		console.log(err || response);
-	});
-	//response is:
-	//{ok: true, id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", rev: "2-07b996d6afbba32f73b7d772f061397a"}
+		tag_array = tags.split(",");
+    	for(var i=tag_array.length; i--;)
+    	{
+    		tag_array[i] = $.trim(tag_array[i]);//strip whitespace
+    	}
+    	console.log(tag_array);
+	}
+	if(note_id==null && rev==null && title!=null)
+	{
+		//new note
+		var tags = []
+		if(tag_array!=null)
+		{
+			tags = tag_array;
+		}
+		db.post({title: title, content: value, customer_id: 0, tags: tags}, function (err, response)
+		{
+  			console.log(err || response);
+		});
+	}
+	else
+	{
+		// update a document; log the response
+		var tags = []
+		if(tag_array!=null)
+		{
+			tags = tag_array;
+		}
+		db.put({_id: note_id, _rev: rev, title: title, content: value, customer_id: 0, tags: tags}, function (err, response) 
+		{
+  			console.log(err || response);
+		});
+		//response is:
+		//{ok: true, id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", rev: "2-07b996d6afbba32f73b7d772f061397a"}
+	}
 }
 
 function remove()
@@ -56,11 +159,19 @@ function remove()
 	// {ok: true, id: "1EB83EE4-494C-0E55-A3DF-5B13955810DE", rev: "3-c35dceb6732ec828befdf67e817565e7"}
 }
 
-function search(type, query)
+function search(type, query, response)
 {
 	// separate the type and query by a colon
 	url = "https://eurisko.cloudant.com/eurisko/_design/searchDoc/_search/searchIndex?q="
-	suffix = type + ":" + query
+	if(type=='both')
+	{
+		//title:firststse OR content:worldssdf
+		suffix = 'title:' + query + ' OR content:' + query + ' OR title:' + query + '*';
+	}
+	else
+	{
+		suffix = type + ":" + query
+	}
 	console.log(suffix);
 	$.ajax
 	({
@@ -74,6 +185,19 @@ function search(type, query)
   		success: function (data)
   		{
     		console.log(data);
+    		results = [];
+    		if(data['total_rows']>0)
+    		{
+    			rows = data['rows'];
+    			for(var i=rows.length; i--;)
+    			{
+  					var row=rows[i];
+  					data = { label: row['fields']['title'], value: row['fields']['title'], type: 'note', note_id: row['id']}
+    				results.push(data);    				
+    			}
+    		}
+    		console.log(results);
+    		response(results);
   		}
 	});
 	// response is:
@@ -82,51 +206,152 @@ function search(type, query)
 	// {"total_rows":0,"bookmark":"g2o","rows":[]}
 }
 
-function parse_input()
+function generate_autocomplete(request, response)
 {
-	var input = $("#search").val();
+	console.log(request.term);
+	query = parse_input(request.term);
+	results = [];
+	if(query!=null)
+	{
+		if(query['type']=='new')
+		{
+			data = { label: 'Add new note: ' + query['text'], value: query['text'], type: 'new_note'}
+			results.push(data);
+			console.log(results);
+			response(results);
+		}
+		else if(query['type']=='tag')
+		{
+			search('tag', query['text'], response);
+		}
+		else if(query['type']=='append')
+		{
+			data = { label: 'Append data to note ' + query['note_to_append_to'], value: query['text_to_append'], type: 'append_to_note', note_to_append_to: query['note_to_append_to']}
+			results.push(data);
+			console.log(results);
+			response(results);
+		}
+		else if(query['type']=='search')
+		{
+			search('both', query['text'], response);
+		}
+	}
+}
+
+function appendToNote(title, text_to_append)
+{
+	//first, get the note
+	search('title',title,function(data)
+	{
+		console.log('got search result back');
+		if(data.length>1)
+		{
+			console.log('picking first title');
+		}
+		var note_id = data[0]['note_id'];
+		console.log(note_id);
+		db.get(note_id.toString(), function (err, response) 
+		{
+			console.log('got note info back');
+  			var content = response['content'];
+  			var rev = response['_rev'];
+  			//then append the text to the bottom of note
+  			content = content + '<br/>' + text_to_append;
+  			//then update the note
+  			db.put({_id: note_id, _rev: rev, title: title, customer_id: 0, tags: [], content: content}, function (err, response) 
+			{
+  				console.log('updated note info');
+  				console.log(err || response);
+			});
+		});
+	});
+}
+
+$( document ).ready(function() {
+
+$('#search').autocomplete({
+    minLength: 2,
+    source: function(request, response)
+    	{
+    		generate_autocomplete(request, response);
+    	},
+    select: function(event, ui)
+    {
+		// this is called when you've pressed enter on an item in dropdown list    
+		if(ui)
+		{
+			console.log(ui.item.type);
+	    	if (ui.item.type=="note")
+	    	{
+	    		openNote(ui.item.note_id);
+	    	}
+	    	else if (ui.item.type=="append_to_note")
+	    	{
+	    		appendToNote(ui.item.note_to_append_to, ui.item.value);
+	    	}
+	    	else if (ui.item.type=="new_note")
+	    	{
+	    		createNote(ui.item.value);
+	    	}
+		}
+    }
+});
+});
+
+function parse_input(input)
+{
+	query = {};
 	if(input.search("\\+")==0)
 	{
 		//+ to append
 		console.log('new note');
+		query['type'] = 'new';
+		query['text'] = input.substring(1);
 	}
 	else if(input.search("\\#")==0)
 	{
 		//#search tags
 		console.log('searching tags');
+		query['type'] = 'tag';
+		query['text'] = input.substring(1);
 	}
 	else if(input.search("\\>")==0)
 	{
 		console.log('appending to note');
+		query['type'] = 'append';
+		parts = input.substring(1).split("\"");
+		if(parts.length>2)
+		{
+			query['text_to_append'] = parts[1];
+			query['note_to_append_to'] = parts[0];
+			console.log(query['text_to_append']);
+			console.log(query['note_to_append_to']);
+		}
 	}
 	else
 	{
 		console.log('searching');
-		search('title', input);
-		search('content', input);
+		query['type'] = 'search';
+		query['text'] = input;
 	}
+	return query;
 }
 
+//other features (delete note)
+
+//UI - display all titles in expandable list... display all tags, can hover to see other notes with tag.  parse @'title links'.  each line snippet of its own... swipe left/right to delete or move.  hierarchy of bullets that can re-arrange.
+//edge cases: spaces, apostrophes in title name
+
 //note format:
-//customer_id, title, content, child_of, children, last_updated, tags
-
-//link format:
-//@title
-
-//parse_search
-//add 'create new note'
-//issue title & content searches
-//parse append
+//customer_id, title, content, child_of, children, last_updated, tags: []
 
 </script>
 </head>
-<div id='title'>
-	<a href='javascript:read()'>read</a>
-	<a href='javascript:write()'>write</a>
-	<a href='javascript:update()'>update</a>
-	<a href='javascript:remove()'>remove</a>
-	<a href='javascript:parse_input()'>search</a>
+<body style="background-image:url(images/bg.jpg);background-repeat:repeat;">
+<div id='title' style='margin: auto; width: 10%;'>
 	<input type='text' id='search'>
 </div>
-<div id='note'></div>
+<div id='note' contentEditable='true' style='background-color:white; max-height: 300px; width: 100%; overflow-x:hidden; overflow-y:auto;' class='doc rounded {bottom transparent}'></div>
+<div id='tags' contentEditable='true' style='background-color:white; max-height: 300px; width: 100%; overflow-x:hidden; overflow-y:auto;' class='doc rounded {bottom transparent}'></div>
+</body>
 </html>
